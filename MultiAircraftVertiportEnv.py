@@ -37,7 +37,7 @@ class MultiAircraftEnv(gym.Env):
             low=np.array([0, 0]),
             high=np.array([self.window_width, self.window_height]),
             dtype=np.float32)  # position range is the length and width of airspace
-        self.action_space = spaces.Tuple((spaces.Discrete(3),) * self.num_aircraft)
+        self.action_space = spaces.Tuple((spaces.Discrete(3),) * self.n_evtol)
         # action space deprecated, since number of aircraft is changing from time to time
 
         self.conflicts = 0
@@ -52,9 +52,9 @@ class MultiAircraftEnv(gym.Env):
         # input dim
         self.window_width = Config.window_width
         self.window_height = Config.window_height  # dimension of the airspace
-        self.num_aircraft = Config.num_aircraft
-        self.EPISODES = Config.EPISODES
-        # self.tick = Config.tick
+        self.n_evtol = Config.n_evtol
+        self.epochs = Config.epochs
+        # self.pixel_meter = Config.pixel_meter
         self.scale = Config.scale  # 1 meter = ? pixels, set to 60 here
         self.minimum_separation = Config.minimum_separation
         self.NMAC_dist = Config.NMAC_dist
@@ -68,8 +68,8 @@ class MultiAircraftEnv(gym.Env):
     def load_vertiport(self):
         self.vertiport_list = []
         # read the vertiport location from config file
-        for i in range(Config.vertiport_loc.shape[0]):
-            self.vertiport_list.append(VertiPort(id=i, position=Config.vertiport_loc[i]))
+        for i in range(Config.VerticalPortLocation.shape[0]):
+            self.vertiport_list.append(VertiPort(id=i, position=Config.VerticalPortLocation[i]))
 
     def reset(self):
         # aircraft is stored in this dict
@@ -89,8 +89,8 @@ class MultiAircraftEnv(gym.Env):
         # aircraft is stored in this list
         self.aircraft_list = []
 
-        for id in range(self.num_aircraft):
-            theta = 2 * id * math.pi / self.num_aircraft
+        for id in range(self.n_evtol):
+            theta = 2 * id * math.pi / self.n_evtol
             r = self.window_width / 2 - 10
             x = r * np.cos(theta)
             y = r * np.sin(theta)
@@ -185,7 +185,7 @@ class MultiAircraftEnv(gym.Env):
                 dist_array, id_array = self.dist_to_all_aircraft(aircraft)
                 min_dist = min(dist_array) if dist_array.shape[0] > 0 else 9999
                 # add it to dict only if it's far from others
-                if min_dist > 3 * self.minimum_separation:  # and self.aircraft_dict.num_aircraft < 10:
+                if min_dist > 3 * self.minimum_separation:  # and self.aircraft_dict.n_evtol < 10:
                     self.aircraft_dict.add(aircraft)
                     self.id_tracker += 1  # increase id_tracker
 
@@ -277,7 +277,7 @@ class MultiAircraftEnv(gym.Env):
         from gym.envs.classic_control import rendering
         from colour import Color
         red = Color('red')
-        colors = list(red.range_to(Color('green'), self.num_aircraft))
+        colors = list(red.range_to(Color('green'), self.n_evtol))
 
         if self.viewer is None:
             self.viewer = rendering.Viewer(self.window_width, self.window_height)
@@ -291,7 +291,7 @@ class MultiAircraftEnv(gym.Env):
             aircraft_img = rendering.Image(os.path.join(__location__, 'images/aircraft.png'), 32, 32)
             jtransform = rendering.Transform(rotation=aircraft.heading - math.pi / 2, translation=aircraft.position)
             aircraft_img.add_attr(jtransform)
-            r, g, b = colors[aircraft.id % self.num_aircraft].get_rgb()
+            r, g, b = colors[aircraft.id % self.n_evtol].get_rgb()
             aircraft_img.set_color(r, g, b)
             self.viewer.onetime_geoms.append(aircraft_img)
 
@@ -362,7 +362,7 @@ class MultiAircraftEnv(gym.Env):
             'goal_y': spaces.Box(low=0, high=self.window_height, shape=(1,), dtype=np.float32),
         })
 
-        return spaces.Tuple((s,) * self.num_aircraft)
+        return spaces.Tuple((s,) * self.n_evtol)
 
 
 class AircraftDict:
@@ -371,7 +371,7 @@ class AircraftDict:
 
     # how many aircraft currently en route
     @property
-    def num_aircraft(self):
+    def n_evtol(self):
         return len(self.ac_dict)
 
     # add aircraft to dict
@@ -398,7 +398,7 @@ class AircraftDict:
 #         self.id_list = []
 #
 #     @property
-#     def num_aircraft(self):
+#     def n_evtol(self):
 #         return len(self.ac_list)
 #
 #     def add(self, aircraft):
@@ -452,7 +452,7 @@ class Aircraft:
         self.conflict_id_set = set()  # store the id of all aircraft currently in conflict
 
     def load_config(self):
-        self.G = Config.G
+        self.g = Config.g
         self.scale = Config.scale
         self.min_speed = Config.min_speed
         self.max_speed = Config.max_speed

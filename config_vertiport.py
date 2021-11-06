@@ -1,11 +1,12 @@
 import math
 import numpy as np
 
+##
 print('loading vertiport configuration')
 
-
+## The 
 def pointy_hex_corner(center, size, i):
-    angle_deg = 60 * i
+    angle_deg = 90 * i
     angle_rad = math.radians(angle_deg)
     return (center[0] + size * math.cos(angle_rad),
             center[1] + size * math.sin(angle_rad))
@@ -13,19 +14,24 @@ def pointy_hex_corner(center, size, i):
 
 class Config:
     # experiment setting
-    no_episodes = 5
+    #n_episodes 
+    n_epochs= 5
 
     # airspace setting
     window_width = 800
     window_height = 800
-    num_aircraft = 10
-    EPISODES = 1000
-    G = 9.8
-    tick = 30
+    #num_aircraft
+    n_evtol = 2
+    #EPISODES 
+    epochs = 1000
+    g = 9.8
+    #tick
+    pixel_meter = 30
     scale = 60  # 1 pixel = 30 meters
 
     # distance param
-    minimum_separation = 555/scale
+    #minimum_separation 
+    min_sep = 555/scale
     NMAC_dist = 150/scale
     horizon_dist = 4000/scale
     initial_min_dist = 3000/scale
@@ -59,10 +65,14 @@ class Config:
     sparse_reward = True
 
     # vertiport parameter
-    time_interval_lower = 60
-    time_interval_upper = 180
-    vertiport_loc = np.zeros([7, 2])
-    vertiport_center = np.array([window_width/2, window_height/2])
-    vertiport_loc[0, :] = vertiport_center
+    #time_interval_lower
+    minTimeInterwal = 60
+    #time_interval_upper
+    maxTimeInterval = 180
+    #vertiport_loc
+    VerticalPortLocation= np.zeros([7, 2])
+    #vertiport_center 
+    VerticalPortCenter = np.array([window_width/2, window_height/2])
+    VerticalPortLocation[0, :] = VerticalPortCenter
     for i in range(1, 7):
-        vertiport_loc[i, :] = pointy_hex_corner(vertiport_center, size=300, i=i)
+        VerticalPortLocation[i, :] = pointy_hex_corner(VerticalPortCenter, size=300, i=i)
