@@ -1,24 +1,24 @@
 import numpy as np
 
 
-class MCTSState:
+class MCTS_State:
     def __init__(self, state):
         self.state = state
 
     def reward(self):
-        raise NotImplemented("Implement game_result function")
+        raise NotImplemented()
 
     def is_terminal_state(self, search_depth):
-        raise NotImplemented("Implement is_game_over function")
+        raise NotImplemented()
 
     def move(self, action):
-        raise NotImplemented("Implement move function")
+        raise NotImplemented()
 
     def get_legal_actions(self):
-        raise NotImplemented("Implement get_legal_actions function")
+        raise NotImplemented()
 
 
-class MCTSNode:
+class MCTS_Node:
     def __init__(self, parent=None):
         self.parent = parent
         self.children = []

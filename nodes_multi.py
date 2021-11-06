@@ -2,11 +2,12 @@ import copy
 import math
 import numpy as np
 
-from common import MCTSNode, MCTSState
+from common import MCTS_Node, MCTS_State
 from config_vertiport import Config
 
-
-class MultiAircraftState(MCTSState):
+#derived class from MCTS_State
+class MultiAircraftState(MCTS_State):
+    #initialising
     def __init__(self,
                  state,
                  index,
@@ -16,7 +17,9 @@ class MultiAircraftState(MCTSState):
                  reach_goal=False,
                  prev_action=None,
                  depth=0):
-        MCTSState.__init__(self, state)
+        #initialising members of parent class
+        MCTS_State.__init__(self, state)
+        #initialising other members
         self.index = index
         self.init_action = init_action
         self.hit_wall = hit_wall
@@ -31,19 +34,20 @@ class MultiAircraftState(MCTSState):
         self.nearest_x = -1
         self.nearest_y = -1
 
-    # reward needs to be tuned
+    # reward function
     def reward(self):
         if self.hit_wall or self.conflict:
             r = 0
         elif self.reach_goal:
             r = 1
         else:
-            r = 1 - self.dist_goal() / 1200.0  # - self.dist_intruder() / 1200
+            r = 1 - self.dist_goal() / 1600.0
             r /= 4
         return r
 
+    # check if terminal state
     def is_terminal_state(self, search_depth):
-        if self.reach_goal or self.conflict or self.hit_wall or self.depth == search_depth:
+        if self.reach_goal or self.hit_wall or self.conflict or self.depth == search_depth:
             return True
         return False
 
@@ -51,10 +55,8 @@ class MultiAircraftState(MCTSState):
         if self.depth < 1:
             next_state = self._move(a)
         else:
-            random_action = np.random.randint(0, 3, size=self.state.shape[0])
-            next_state = self._move(random_action)
-            # print('rand2')
-
+            rand_action = np.random.randint(0, 3, size=self.state.shape[0])
+            next_state = self._move(rand_action)
         return next_state
 
     def _move(self, a):
@@ -85,6 +87,7 @@ class MultiAircraftState(MCTSState):
             goalx = state[self.index][6]
             goaly = state[self.index][7]
 
+            #checks for variables denoting terminal states
             if not 0 < ownx < Config.window_width or not 0 < owny < Config.window_height:
                 hit_wall = True
                 break
@@ -100,11 +103,15 @@ class MultiAircraftState(MCTSState):
 
     def get_legal_actions(self):
         return [0, 1, 2]
+    
+    def metric(self, x1, y1, x2, y2):
+        dx = x1 - x2
+        dy = y1 - y2
+        f_dist = math.sqrt(dx**2 + dy**2)
+        return f_dist
 
     def dist_goal(self):
-        dx = self.ownx - self.goalx
-        dy = self.owny - self.goaly
-        return math.sqrt(dx**2 + dy**2)
+        return self.metric(self.ownx, self.owny, self.goalx, self.goaly)
 
     def dist_intruder(self, state, ownx, owny):
         distance = 5000
@@ -117,11 +124,6 @@ class MultiAircraftState(MCTSState):
                 self.nearest_x = otherx
                 self.nearest_y = othery
         return distance
-
-    def metric(self, x1, y1, x2, y2):
-        dx = x1 - x2
-        dy = y1 - y2
-        return math.sqrt(dx**2 + dy**2)
 
     # state: (x, y, vx, vy, heading angle, gx, gy)
     @property
@@ -140,26 +142,10 @@ class MultiAircraftState(MCTSState):
     def goaly(self):
         return self.state[self.index][7]
 
-    def __repr__(self):
-        s = 'index: %d, prev action: %s, pos: %.2f,%.2f, goal: %.2f,%.2f, dist goal: %.2f, dist intruder: %f,' \
-            'nearest intruder: (%.2f, %.2f), depth: %d' \
-            % (self.index,
-               self.prev_action,
-               self.ownx,
-               self.owny,
-               self.goalx,
-               self.goaly,
-               self.dist_goal(),
-               self.dist_intruder(self.state, self.ownx, self.owny),
-               self.nearest_x,
-               self.nearest_y,
-               self.depth)
-        return s
 
-
-class MultiAircraftNode(MCTSNode):
+class MultiAircraftNode(MCTS_Node):
     def __init__(self, state: MultiAircraftState, parent=None):
-        MCTSNode.__init__(self, parent)
+        MCTS_Node.__init__(self, parent)
         self.state = state
 
     @property
@@ -202,21 +188,3 @@ class MultiAircraftNode(MCTSNode):
         self.q += result
         if self.parent:
             self.parent.backpropagate(result)
-
-    def __repr__(self):
-        s = 'Agent: %d, Node: children: %d; visits: %d; reward: %.4f; p_action: %s, state: (%.2f, %.2f); ' \
-            'goal: (%.2f, %.2f), dist: %.2f, nearest: (%.2f, %.2f)' \
-            % (self.state.index + 1,
-               len(self.children),
-               self.n,
-               self.q / (self.n + 1e-2),
-               self.state.prev_action,
-               self.state.ownx,
-               self.state.owny,
-               self.state.goalx,
-               self.state.goaly,
-               self.state.dist_goal(),
-               self.state.nearest_x,
-               self.state.nearest_y)
-
-        return s
