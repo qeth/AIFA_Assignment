@@ -56,14 +56,14 @@ class MultiAircraftEnv(gym.Env):
         self.epochs = Config.epochs
         # self.pixel_meter = Config.pixel_meter
         self.scale = Config.scale  # 1 meter = ? pixels, set to 60 here
-        self.minimum_separation = Config.minimum_separation
-        self.NMAC_dist = Config.NMAC_dist
-        # self.horizon_dist = Config.horizon_dist
-        self.initial_min_dist = Config.initial_min_dist  # when aircraft generated, is shouldn't be too close to others
-        self.goal_radius = Config.goal_radius
-        self.init_speed = Config.init_speed
-        self.min_speed = Config.min_speed
-        self.max_speed = Config.max_speed
+        self.minSep = Config.minSep
+        self.nmacDist = Config.nmacDist
+        # self.horDist = Config.horDist
+        self.initMinDistance = Config.initMinDistance  # when aircraft generated, is shouldn't be too close to others
+        self.goalRadius = Config.goalRadius
+        self.initialVelocity = Config.initialVelocity
+        self.minVelocity = Config.minVelocity
+        self.maxVelocity = Config.maxVelocity
 
     def load_vertiport(self):
         self.vertiport_list = []
@@ -100,7 +100,7 @@ class MultiAircraftEnv(gym.Env):
             aircraft = Aircraft(
                 id=id,
                 position=position,
-                speed=self.init_speed,
+                speed=self.initialVelocity,
                 heading=theta + math.pi,
                 goal_pos=goal_pos
             )
@@ -135,8 +135,8 @@ class MultiAircraftEnv(gym.Env):
         # pos, vel, speed, heading for ownship
         # goal pos
         def normalize_velocity(velocity):
-            translation = velocity + self.max_speed
-            return translation / (self.max_speed * 2)
+            translation = velocity + self.maxVelocity
+            return translation / (self.maxVelocity * 2)
 
         s = []
         id = []
@@ -149,7 +149,7 @@ class MultiAircraftEnv(gym.Env):
             s.append(aircraft.position[1] / Config.window_height)
             s.append(normalize_velocity(aircraft.velocity[0]))
             s.append(normalize_velocity(aircraft.velocity[1]))
-            s.append((aircraft.speed - Config.min_speed) / (Config.max_speed - Config.min_speed))
+            s.append((aircraft.speed - Config.minVelocity) / (Config.maxVelocity - Config.minVelocity))
             s.append(aircraft.heading / (2 * math.pi))
             s.append(aircraft.goal.position[0] / Config.window_width)
             s.append(aircraft.goal.position[1] / Config.window_height)
@@ -177,7 +177,7 @@ class MultiAircraftEnv(gym.Env):
                 aircraft = Aircraft(
                     id=self.id_tracker,
                     position=vertiport.position,
-                    speed=self.init_speed,
+                    speed=self.initialVelocity,
                     heading=self.random_heading(),
                     goal_pos=self.vertiport_list[goal_vertiport_id].position
                 )
@@ -185,7 +185,7 @@ class MultiAircraftEnv(gym.Env):
                 dist_array, id_array = self.dist_to_all_aircraft(aircraft)
                 min_dist = min(dist_array) if dist_array.shape[0] > 0 else 9999
                 # add it to dict only if it's far from others
-                if min_dist > 3 * self.minimum_separation:  # and self.aircraft_dict.n_evtol < 10:
+                if min_dist > 3 * self.minSep:  # and self.aircraft_dict.n_evtol < 10:
                     self.aircraft_dict.add(aircraft)
                     self.id_tracker += 1  # increase id_tracker
 
@@ -202,9 +202,9 @@ class MultiAircraftEnv(gym.Env):
         1. for each aircraft:
           a. if there a conflict, return a penalty for it
           b. if there is NMAC, assign a penalty to it and prepare to remove this aircraft from dict
-          b. elif it is out of map, assign its reward as Config.wall_penalty, prepare to remove it
-          c. elif if it reaches goal, assign its reward to Config.goal_reward, prepare to remove it
-          d. else assign its reward as Config.step_penalty.
+          b. elif it is out of map, assign its reward as Config.wallPenalty, prepare to remove it
+          c. elif if it reaches goal, assign its reward to Config.goalReward, prepare to remove it
+          d. else assign its reward as Config.stepPenalty.
         3. remove out-of-map aircraft and goal-aircraft
 
         """
@@ -224,7 +224,7 @@ class MultiAircraftEnv(gym.Env):
             # set the conflict flag to false for aircraft
             # elif conflict, set penalty reward and conflict flag but do NOT remove the aircraft from list
             for id, dist in zip(id_array, dist_array):
-                if dist >= self.minimum_separation:  # safe
+                if dist >= self.minSep:  # safe
                     aircraft.conflict_id_set.discard(id)  # discarding element not in the set won't raise error
 
                 else:  # conflict!!
@@ -233,26 +233,26 @@ class MultiAircraftEnv(gym.Env):
                         self.conflicts += 1
                         aircraft.conflict_id_set.add(id)
                         # info['c'].append('%d and %d' % (aircraft.id, id))
-                    aircraft.reward = Config.conflict_penalty
+                    aircraft.reward = Config.conflictPenalty
 
             # if NMAC, set penalty reward and prepare to remove the aircraft from list
-            if min_dist < self.NMAC_dist:
+            if min_dist < self.nmacDist:
                 # info['n'].append('%d and %d' % (aircraft.id, close_id))
-                aircraft.reward = Config.NMAC_penalty
+                aircraft.reward = Config.nmac_penalty
                 aircraft_to_remove.append(aircraft)
                 self.NMACs += 1
                 # aircraft_to_remove.append(self.aircraft_dict.get_aircraft_by_id(close_id))
 
             # give out-of-map aircraft a penalty, and prepare to remove it
             elif not self.position_range.contains(np.array(aircraft.position)):
-                aircraft.reward = Config.wall_penalty
+                aircraft.reward = Config.wallPenalty
                 # info['w'].append(aircraft.id)
                 if aircraft not in aircraft_to_remove:
                     aircraft_to_remove.append(aircraft)
 
             # set goal-aircraft reward according to simulator, prepare to remove it
-            elif dist_goal < self.goal_radius:
-                aircraft.reward = Config.goal_reward
+            elif dist_goal < self.goalRadius:
+                aircraft.reward = Config.goalReward
                 # info['g'].append(aircraft.id)
                 self.goals += 1
                 if aircraft not in aircraft_to_remove:
@@ -260,7 +260,7 @@ class MultiAircraftEnv(gym.Env):
 
             # for aircraft without NMAC, conflict, out-of-map, goal, set its reward as simulator
             elif not conflict:
-                aircraft.reward = Config.step_penalty
+                aircraft.reward = Config.stepPenalty
 
             # accumulates reward
             reward += aircraft.reward
@@ -345,7 +345,7 @@ class MultiAircraftEnv(gym.Env):
         )
 
     def random_speed(self):
-        return np.random.uniform(low=self.min_speed, high=self.max_speed)
+        return np.random.uniform(low=self.minVelocity, high=self.maxVelocity)
 
     def random_heading(self):
         return np.random.uniform(low=0, high=2 * math.pi)
@@ -354,9 +354,9 @@ class MultiAircraftEnv(gym.Env):
         s = spaces.Dict({
             'pos_x': spaces.Box(low=0, high=self.window_width, shape=(1,), dtype=np.float32),
             'pos_y': spaces.Box(low=0, high=self.window_height, shape=(1,), dtype=np.float32),
-            'vel_x': spaces.Box(low=-self.max_speed, high=self.max_speed, shape=(1,), dtype=np.float32),
-            'vel_y': spaces.Box(low=-self.max_speed, high=self.max_speed, shape=(1,), dtype=np.float32),
-            'speed': spaces.Box(low=self.min_speed, high=self.max_speed, shape=(1,), dtype=np.float32),
+            'vel_x': spaces.Box(low=-self.maxVelocity, high=self.maxVelocity, shape=(1,), dtype=np.float32),
+            'vel_y': spaces.Box(low=-self.maxVelocity, high=self.maxVelocity, shape=(1,), dtype=np.float32),
+            'speed': spaces.Box(low=self.minVelocity, high=self.maxVelocity, shape=(1,), dtype=np.float32),
             'heading': spaces.Box(low=0, high=2 * math.pi, shape=(1,), dtype=np.float32),
             'goal_x': spaces.Box(low=0, high=self.window_width, shape=(1,), dtype=np.float32),
             'goal_y': spaces.Box(low=0, high=self.window_height, shape=(1,), dtype=np.float32),
@@ -454,15 +454,15 @@ class Aircraft:
     def load_config(self):
         self.g = Config.g
         self.scale = Config.scale
-        self.min_speed = Config.min_speed
-        self.max_speed = Config.max_speed
-        self.speed_sigma = Config.speed_sigma
-        self.position_sigma = Config.position_sigma
+        self.minVelocity = Config.minVelocity
+        self.maxVelocity = Config.maxVelocity
+        self.vel_sigma = Config.vel_sigma
+        self.pos_sigma = Config.pos_sigma
         self.d_heading = Config.d_heading
 
     def step(self, a=1):
-        self.speed = max(self.min_speed, min(self.speed, self.max_speed))  # project to range
-        self.speed += np.random.normal(0, self.speed_sigma)  # uncertainty
+        self.speed = max(self.minVelocity, min(self.speed, self.maxVelocity))  # project to range
+        self.speed += np.random.normal(0, self.vel_sigma)  # uncertainty
         self.heading += (a - 1) * self.d_heading  # change heading
         vx = self.speed * math.cos(self.heading)
         vy = self.speed * math.sin(self.heading)
